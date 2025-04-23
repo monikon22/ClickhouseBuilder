@@ -1,5 +1,5 @@
 {
-  "name": "the-tinderbox/clickhouse-builder",
+  "name": "monikon22/clickhouse-builder",
   "description": "Clickhouse sql query builder",
   "authors": [
     {
@@ -9,6 +9,10 @@
     {
       "name": "Evsign",
       "email": "evsign.alex@gmail.com"
+    },
+    {
+      "name": "Monikon22",
+      "email": "monikon22@gmail.com"
     }
   ],
   "autoload": {
