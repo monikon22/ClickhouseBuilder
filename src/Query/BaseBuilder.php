@@ -1688,7 +1688,14 @@ abstract class BaseBuilder
      */
     public function take(int $limit, int $offset = null)
     {
-        return $this->limit($limit, $offset);
+        if(is_null($this->limit)) {
+            return $this->limit($limit, $offset);
+        }
+
+        $this->limit->limit = $limit;
+        $this->limit->offset = $offset ?? $this->limit->offset;
+
+        return $this;
     }
 
     /**

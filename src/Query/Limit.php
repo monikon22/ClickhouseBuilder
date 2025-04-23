@@ -9,21 +9,21 @@ class Limit
      *
      * @var int|null
      */
-    private $limit;
+    public $limit;
 
     /**
      * Number of rows to skip.
      *
      * @var int|null
      */
-    private $offset;
+    public $offset;
 
     /**
      * Columns to limit distinctly.
      *
      * @var array
      */
-    private $by = [];
+    public $by = [];
 
     /**
      * Limit constructor.
