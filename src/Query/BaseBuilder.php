@@ -1656,6 +1656,12 @@ abstract class BaseBuilder
      */
     public function limit(int $limit, int $offset = null)
     {
+        if($limit <= 0) {
+            $this->limit = new Limit(null, $offset);
+
+            return $this;
+        }
+
         $this->limit = new Limit($limit, $offset);
 
         return $this;
@@ -1673,7 +1679,7 @@ abstract class BaseBuilder
     {
         $columns = isset($columns[0]) && is_array($columns[0]) ? $columns[0] : $columns;
 
-        $this->limitBy = new Limit($count, null, $this->processColumns($columns, false));
+        $this->limitBy = new Limit($count <= 0 ? null : $count, null, $this->processColumns($columns, false));
 
         return $this;
     }
@@ -1692,7 +1698,7 @@ abstract class BaseBuilder
             return $this->limit($limit, $offset);
         }
 
-        $this->limit->limit = $limit;
+        $this->limit->limit = $limit <= 0 ? null : $limit;
         $this->limit->offset = $offset ?? $this->limit->offset;
 
         return $this;
