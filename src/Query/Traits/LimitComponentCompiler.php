@@ -27,6 +27,10 @@ trait LimitComponentCompiler
             $limitElements[] = $limit->getLimit();
         }
 
+        if(empty($limitElements)) {
+            return '';
+        }
+
         return 'LIMIT '.implode(', ', $limitElements);
     }
 }
