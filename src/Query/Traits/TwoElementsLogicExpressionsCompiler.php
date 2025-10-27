@@ -50,9 +50,9 @@ trait TwoElementsLogicExpressionsCompiler
 
                 if (!is_null($operator)) {
                     $result[] = $operator;
-                }
 
-                $result[] = $this->compileElement($secondElement);
+                    $result[] = $this->compileElement($secondElement);
+                }
             }
         }
 
@@ -70,11 +70,6 @@ trait TwoElementsLogicExpressionsCompiler
      */
     private function compileElement($element)
     {
-        // Skip null elements
-        if (is_null($element)) {
-            return '';
-        }
-
         $result = [];
 
         if (is_array($element)) {
@@ -86,7 +81,7 @@ trait TwoElementsLogicExpressionsCompiler
         } elseif ($element instanceof Column) {
             $result[] = $this->compileColumn($element);
         } else {
-            // Wrap element
+            // Wrap element (including null)
             $result[] = $this->wrap($element);
         }
 

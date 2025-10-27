@@ -471,8 +471,8 @@ class PreparedStatementsTest extends TestCase
         $sql = $builder->toSql();
         $bindings = $builder->getBindings();
 
-        // null should not be converted to parameter
-        $this->assertStringContainsString('null', $sql);
+        // null should be rendered as null keyword in SQL
+        $this->assertStringContainsString('= null', $sql);
         $this->assertCount(0, $bindings);
     }
 

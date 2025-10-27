@@ -79,14 +79,14 @@ class FunctionsTest extends TestCase
         $client = new Client((new ServerProvider())->addServer($server));
 
         $realFiles = [
-            $this->putInTempFile('5'.PHP_EOL.'6'.PHP_EOL),
-            $this->putInTempFile('7'.PHP_EOL.'8'.PHP_EOL),
-            $this->putInTempFile('9'.PHP_EOL.'10'.PHP_EOL),
+            $this->putInTempFile('5'."\n".'6'."\n"),
+            $this->putInTempFile('7'."\n".'8'."\n"),
+            $this->putInTempFile('9'."\n".'10'."\n"),
         ];
 
         $files = [
-            '1'.PHP_EOL.'2'.PHP_EOL,
-            new FileFromString('3'.PHP_EOL.'4'.PHP_EOL),
+            '1'."\n".'2'."\n",
+            new FileFromString('3'."\n".'4'."\n"),
             new File($realFiles[0]),
             $realFiles[2],
         ];

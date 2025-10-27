@@ -324,7 +324,7 @@ class Connection extends \Illuminate\Database\Connection
      */
     public function select($query, $bindings = [], $tables = [])
     {
-        $result = $this->getClient()->readOne($query, $tables);
+        $result = $this->getClient()->readOne($query, $tables, [], $bindings);
 
         $this->logQuery($result->getQuery()->getQuery(), [], $result->getStatistic()->getTime());
 
@@ -343,7 +343,7 @@ class Connection extends \Illuminate\Database\Connection
     public function selectAsync(array $queries)
     {
         foreach ($queries as $i => $query) {
-            if (method_exists($query, 'toQuery')) {
+            if (is_object($query) && method_exists($query, 'toQuery')) {
                 $queries[$i] = $query->toQuery();
             }
         }
@@ -428,7 +428,7 @@ class Connection extends \Illuminate\Database\Connection
     {
         $startTime = microtime(true);
 
-        $result = $this->getClient()->writeOne($query);
+        $result = $this->getClient()->writeOne($query, [], [], $bindings);
 
         $this->logQuery($query, $bindings, microtime(true) - $startTime);
 
@@ -478,7 +478,7 @@ class Connection extends \Illuminate\Database\Connection
      */
     public function delete($query, $bindings = [])
     {
-        return $this->statement($query);
+        return $this->statement($query, $bindings);
     }
 
     /**
@@ -520,7 +520,7 @@ class Connection extends \Illuminate\Database\Connection
     {
         $start = microtime(true);
 
-        $result = $this->getClient()->writeOne($query);
+        $result = $this->getClient()->writeOne($query, [], [], $bindings);
 
         $this->logQuery($query, $bindings, microtime(true) - $start);
 

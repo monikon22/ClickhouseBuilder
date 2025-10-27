@@ -157,7 +157,12 @@ class Builder extends BaseBuilder
             }
         }
 
-        return $this->client->writeOne($this->grammar->compileInsert($this, $values));
+        return $this->client->writeOne(
+            $this->grammar->compileInsert($this, $values),
+            [],
+            [],
+            $this->getBindings()
+        );
     }
 
     /**
@@ -170,7 +175,10 @@ class Builder extends BaseBuilder
     public function delete()
     {
         return $this->client->writeOne(
-            $this->grammar->compileDelete($this)
+            $this->grammar->compileDelete($this),
+            [],
+            [],
+            $this->getBindings()
         );
     }
 

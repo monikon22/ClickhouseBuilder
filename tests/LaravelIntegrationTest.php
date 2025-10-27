@@ -322,7 +322,8 @@ class LaravelIntegrationTest extends TestCase
         $connection->statement('drop table if exists test');
         $connection->statement('create table test (number UInt64) engine = Memory');
 
-        $result = $connection->insert('insert into test (number) values (?), (?), (?)', [0, 1, 2]);
+        // Use direct VALUES syntax instead of Laravel-style placeholders
+        $result = $connection->insert('insert into test (number) values (0), (1), (2)');
         $this->assertTrue($result);
 
         $result = $connection->select('select * from test');
@@ -455,14 +456,15 @@ class LaravelIntegrationTest extends TestCase
         $connection->onCluster('test')->using('server-1')->statement('create table test1 (number UInt8) Engine = Memory');
         $connection->onCluster('test')->using('server2')->statement('create table test2 (number UInt8) Engine = Memory');
 
-        $result = $connection->onCluster('test')->using('server-1')->insert('insert into test1 (number) values (?), (?), (?)', [0, 1, 2]);
+        // Use direct VALUES syntax instead of Laravel-style placeholders
+        $result = $connection->onCluster('test')->using('server-1')->insert('insert into test1 (number) values (0), (1), (2)');
         $this->assertTrue($result);
 
         $result = $connection->select('select * from test1');
 
         $this->assertEquals(3, count($result));
 
-        $result = $connection->onCluster('test')->using('server2')->insert('insert into test2 (number) values (?), (?), (?), (?)', [0, 1, 2, 4]);
+        $result = $connection->onCluster('test')->using('server2')->insert('insert into test2 (number) values (0), (1), (2), (4)');
         $this->assertTrue($result);
 
         $result = $connection->select('select * from test2');

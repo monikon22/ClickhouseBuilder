@@ -989,14 +989,14 @@ class BuilderTest extends TestCase
         ], 1);
 
         $realFiles = [
-            $this->putInTempFile('5' . PHP_EOL . '6' . PHP_EOL),
-            $this->putInTempFile('7' . PHP_EOL . '8' . PHP_EOL),
-            $this->putInTempFile('9' . PHP_EOL . '10' . PHP_EOL),
+            $this->putInTempFile('5' . "\n" . '6' . "\n"),
+            $this->putInTempFile('7' . "\n" . '8' . "\n"),
+            $this->putInTempFile('9' . "\n" . '10' . "\n"),
         ];
 
         $files = [
-            '1' . PHP_EOL . '2' . PHP_EOL,
-            new FileFromString('3' . PHP_EOL . '4' . PHP_EOL),
+            '1' . "\n" . '2' . "\n",
+            new FileFromString('3' . "\n" . '4' . "\n"),
             new File($realFiles[0]),
             new TempTable('test', new File($realFiles[1]), ['number' => 'UInt64']),
             $realFiles[2],
@@ -1058,7 +1058,7 @@ class BuilderTest extends TestCase
             'number' => 'UInt64',
         ]);
 
-        $builder->newQuery()->table('test')->insertFile(['number'], new FileFromString('0' . PHP_EOL . '1' . PHP_EOL . '2'));
+        $builder->newQuery()->table('test')->insertFile(['number'], new FileFromString('0' . "\n" . '1' . "\n" . '2'));
 
         $result = $builder->newQuery()->table('test')->count();
 
