@@ -657,4 +657,27 @@ class LaravelIntegrationTest extends TestCase
         $this->assertEquals(30, $lastQueryStatistic->getTime());
         $this->assertEquals(40, $lastQueryStatistic->getRowsBeforeLimitAtLeast());
     }
+
+    public function test_builder_where_with_expression()
+    {
+        $connection = new Connection($this->getSimpleConfig());
+        $connection->statement('drop table if exists test_expr');
+        $connection->statement('create table test_expr (player String, server String) engine = Memory');
+
+        $connection->table('test_expr')->insert([
+            ['player' => 'John', 'server' => 'US'],
+            ['player' => 'jane', 'server' => 'EU'],
+            ['player' => 'bob', 'server' => 'ASIA'],
+        ]);
+
+        // Test multiple where clauses with expressions
+        $result = $connection->table('test_expr')
+            ->where('server', '=', 'US')
+            ->where($connection->raw('LOWER(player)'), 'LIKE', 'j%')
+            ->select('*')
+            ->get();
+
+        $this->assertEquals(1, count($result));
+        $this->assertEquals('John', $result[0]['player']);
+    }
 }

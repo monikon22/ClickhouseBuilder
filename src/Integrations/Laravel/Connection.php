@@ -329,7 +329,7 @@ class Connection extends \Illuminate\Database\Connection
 
         $result = $this->getClient()->readOne($query, $tables, [], $parameters);
 
-        $this->logQuery($result->getQuery()->getQuery(), [], $result->getStatistic()->getTime());
+        $this->logQuery($result->getQuery()->getQuery(), $parameters, $result->getStatistic()->getTime());
 
         $this->setLastQueryStatistic($result->getStatistic());
 
@@ -422,7 +422,7 @@ class Connection extends \Illuminate\Database\Connection
     /**
      * Convert Laravel-style placeholders (?) to ClickHouse parameter format ({pN:Type}).
      * This allows using Laravel syntax with auto-conversion to prepared statements.
-     * 
+     *
      * If bindings is already an associative array with parameter names as keys,
      * it's treated as pre-formatted ClickHouse parameters and returned as-is.
      *
@@ -459,13 +459,30 @@ class Connection extends \Illuminate\Database\Connection
             return false;
         }
 
-        // If it's an associative array and the first key looks like a parameter name (p0, p1, etc.)
-        $firstKey = array_key_first($bindings);
-        if (is_string($firstKey) && preg_match('/^p\d+$/', $firstKey)) {
-            return true;
+        // If it's an associative array and all keys look like parameter names (p0, p1, etc.),
+        // then it's already ClickHouse-style parameters
+        $isAssociative = count(array_filter(array_keys($bindings), 'is_string')) > 0;
+        
+        if (!$isAssociative) {
+            return false;
         }
 
-        return false;
+        // Check if all string keys match the p\d+ pattern
+        $allKeysMatch = true;
+        foreach ($bindings as $key => $value) {
+            if (is_string($key)) {
+                if (!preg_match('/^p\d+$/', $key)) {
+                    $allKeysMatch = false;
+                    break;
+                }
+            } else {
+                // If we have numeric keys mixed with string keys, it's not ClickHouse format
+                $allKeysMatch = false;
+                break;
+            }
+        }
+
+        return $allKeysMatch;
     }
 
     /**
@@ -606,7 +623,7 @@ class Connection extends \Illuminate\Database\Connection
     {
         $result = $this->getClient()->writeFiles($table, $columns, $files, $format, [], $concurrency);
 
-        $this->logQuery('INSERT '.count($files)." FILES INTO {$table}", []);
+        $this->logQuery('INSERT ' . count($files) . " FILES INTO {$table}", []);
 
         return $result;
     }
