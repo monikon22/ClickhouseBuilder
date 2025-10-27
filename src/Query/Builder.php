@@ -46,7 +46,7 @@ class Builder extends BaseBuilder
         if (!empty($this->async)) {
             return $this->client->read($this->toAsyncQueries());
         } else {
-            return $this->client->readOne($this->toSql(), $this->getFiles(), $settings);
+            return $this->client->readOne($this->toSql(), $this->getFiles(), $settings, $this->getBindings());
         }
     }
 
@@ -59,7 +59,7 @@ class Builder extends BaseBuilder
      */
     public function toQuery(array $settings = []): Query
     {
-        return new Query($this->client->getServer(), $this->toSql(), $this->getFiles(), $settings);
+        return new Query($this->client->getServer(), $this->toSql(), $this->getFiles(), $settings, $this->getBindings());
     }
 
     /**
@@ -150,8 +150,7 @@ class Builder extends BaseBuilder
          * Here, we will sort the insert keys for every record so that each insert is
          * in the same order for the record. We need to make sure this is the case
          * so there are not any errors or problems when inserting these records.
-         */
-        else {
+         */ else {
             foreach ($values as $key => $value) {
                 ksort($value);
                 $values[$key] = $value;

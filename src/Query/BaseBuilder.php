@@ -149,6 +149,20 @@ abstract class BaseBuilder
     protected $values;
 
     /**
+     * Query parameters for prepared statements.
+     *
+     * @var Parameter[]
+     */
+    protected $parameters = [];
+
+    /**
+     * Counter for auto-generated parameter names.
+     *
+     * @var int
+     */
+    protected static $parameterCounter = 0;
+
+    /**
      * Set columns for select statement.
      *
      * @param array|mixed $columns
@@ -738,28 +752,42 @@ abstract class BaseBuilder
             $expression->firstElement(is_string($column) ? new Identifier($column) : $column);
         }
 
-        if (is_null($expression->getSecondElement()) && !is_null($value)) {
-            if (is_array($value) && count($value) === 2 && Operator::isValid($operator) && in_array(
-                $operator,
-                [Operator::BETWEEN, Operator::NOT_BETWEEN]
-            )
+        // Check if second element was already set (by closure secondElement() calls or secondElementQuery)
+        // Only set secondElement if it wasn't already set and we have a value to set
+        $secondElementAlreadySet = !is_null($expression->getSecondElement());
+
+        if (!$secondElementAlreadySet && !is_null($value)) {
+            if (
+                is_array($value) && count($value) === 2 && Operator::isValid($operator) && in_array(
+                    $operator,
+                    [Operator::BETWEEN, Operator::NOT_BETWEEN]
+                )
             ) {
                 $value = (new TwoElementsLogicExpression($this))
-                    ->firstElement($value[0])
+                    ->firstElement($this->convertToParameter($value[0]))
                     ->operator(Operator::AND)
-                    ->secondElement($value[1])
+                    ->secondElement($this->convertToParameter($value[1]))
                     ->concatOperator($concatOperator);
-            }
 
-            if (is_array($value) && Operator::isValid($operator) && in_array(
-                $operator,
-                [Operator::IN, Operator::NOT_IN]
-            )
+                $expression->secondElement($value);
+            } elseif (
+                is_array($value) && Operator::isValid($operator) && in_array(
+                    $operator,
+                    [Operator::IN, Operator::NOT_IN]
+                )
             ) {
                 $value = new Tuple($value);
-            }
+                $expression->secondElement($value);
+            } else {
+                // Automatically convert scalar values to parameters (null will remain null)
+                $convertedValue = $this->convertToParameter($value);
 
-            $expression->secondElement($value);
+                // Only set secondElement if converted value is not null
+                // (e.g., for closures in $column position, $value is null by default)
+                if (!is_null($convertedValue)) {
+                    $expression->secondElement($convertedValue);
+                }
+            }
         }
 
         $expression->concatOperator($concatOperator);
@@ -1561,10 +1589,10 @@ abstract class BaseBuilder
             $as = $attribute;
         }
 
-        $id = is_array($key) ? 'tuple('.implode(
+        $id = is_array($key) ? 'tuple(' . implode(
             ', ',
             array_map([$this->grammar, 'wrap'], $key)
-        ).')' : $this->grammar->wrap($key);
+        ) . ')' : $this->grammar->wrap($key);
 
         return $this
             ->addSelect(new Expression("dictGetString('{$dict}', '{$attribute}', {$id}) as `{$as}`"));
@@ -1656,7 +1684,7 @@ abstract class BaseBuilder
      */
     public function limit(int $limit, int $offset = null)
     {
-        if($limit <= 0) {
+        if ($limit <= 0) {
             $this->limit = new Limit(null, $offset);
 
             return $this;
@@ -1694,7 +1722,7 @@ abstract class BaseBuilder
      */
     public function take(int $limit, int $offset = null)
     {
-        if(is_null($this->limit)) {
+        if (is_null($this->limit)) {
             return $this->limit($limit, $offset);
         }
 
@@ -2064,6 +2092,172 @@ abstract class BaseBuilder
         }
 
         return array_merge([$this], $result);
+    }
+
+    /**
+     * Convert a value to Parameter if it's not already one.
+     * Automatically generates parameter name and adds it to the parameters array.
+     *
+     * @param mixed $value Value to convert
+     *
+     * @return Parameter|mixed Returns Parameter for scalar/array values, or original value for special objects
+     */
+    protected function convertToParameter($value)
+    {
+        // If already a Parameter, store it and return as is
+        if ($value instanceof Parameter) {
+            $this->parameters[$value->getName()] = $value;
+            return $value;
+        }
+
+        // Don't convert special objects
+        if (
+            $value instanceof Expression ||
+            $value instanceof Identifier ||
+            $value instanceof Tuple ||
+            $value instanceof BaseBuilder ||
+            $value instanceof TwoElementsLogicExpression
+        ) {
+            return $value;
+        }
+
+        // Don't convert null
+        if ($value === null) {
+            return $value;
+        }
+
+        // For scalar values and arrays, create a Parameter with auto-generated name
+        $paramName = 'p' . self::$parameterCounter++;
+        $parameter = new Parameter($paramName, $value);
+
+        // Store the parameter
+        $this->parameters[$paramName] = $parameter;
+
+        return $parameter;
+    }
+
+    /**
+     * Bind a value to a parameter.
+     *
+     * @param string      $name  Parameter name (without curly braces)
+     * @param mixed       $value Parameter value
+     * @param string|null $type  ClickHouse type (optional, will be inferred if not provided)
+     *
+     * @return $this
+     */
+    public function bindValue(string $name, $value, string $type = null)
+    {
+        $this->parameters[$name] = new Parameter($name, $value, $type);
+
+        return $this;
+    }
+
+    /**
+     * Alias for bindValue method.
+     *
+     * @param string      $name  Parameter name
+     * @param mixed       $value Parameter value
+     * @param string|null $type  ClickHouse type
+     *
+     * @return $this
+     */
+    public function bind(string $name, $value, string $type = null)
+    {
+        return $this->bindValue($name, $value, $type);
+    }
+
+    /**
+     * Set multiple parameters at once.
+     *
+     * @param array $parameters Associative array of parameter names and values
+     * @param array $types      Optional associative array of parameter names and types
+     *
+     * @return $this
+     */
+    public function setParameters(array $parameters, array $types = [])
+    {
+        foreach ($parameters as $name => $value) {
+            $type = $types[$name] ?? null;
+            $this->bindValue($name, $value, $type);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Get all bound parameters.
+     *
+     * @return Parameter[]
+     */
+    public function getParameters(): array
+    {
+        return $this->parameters;
+    }
+
+    /**
+     * Get a specific parameter by name.
+     *
+     * @param string $name Parameter name
+     *
+     * @return Parameter|null
+     */
+    public function getParameter(string $name): ?Parameter
+    {
+        return $this->parameters[$name] ?? null;
+    }
+
+    /**
+     * Check if a parameter exists.
+     *
+     * @param string $name Parameter name
+     *
+     * @return bool
+     */
+    public function hasParameter(string $name): bool
+    {
+        return isset($this->parameters[$name]);
+    }
+
+    /**
+     * Clear all parameters.
+     *
+     * @return $this
+     */
+    public function clearParameters()
+    {
+        $this->parameters = [];
+
+        return $this;
+    }
+
+    /**
+     * Get parameters as bindings array for ClickHouse client.
+     * Returns associative array: ['name1' => value1, 'name2' => value2]
+     * without 'param_' prefix (client will add it automatically).
+     *
+     * @return array
+     */
+    public function getBindings(): array
+    {
+        $result = [];
+
+        foreach ($this->parameters as $parameter) {
+            $result[$parameter->getName()] = $parameter->formatValue();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Deprecated: Use getBindings() instead.
+     * Get parameters formatted for HTTP request.
+     *
+     * @deprecated Use getBindings() instead
+     * @return array
+     */
+    public function getHttpParameters(): array
+    {
+        return $this->getBindings();
     }
 
     /**

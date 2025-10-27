@@ -70,6 +70,11 @@ trait TwoElementsLogicExpressionsCompiler
      */
     private function compileElement($element)
     {
+        // Skip null elements
+        if (is_null($element)) {
+            return '';
+        }
+
         $result = [];
 
         if (is_array($element)) {
@@ -80,7 +85,8 @@ trait TwoElementsLogicExpressionsCompiler
             $result[] = "({$this->compileTuple($element)})";
         } elseif ($element instanceof Column) {
             $result[] = $this->compileColumn($element);
-        } elseif (!is_null($element)) {
+        } else {
+            // Wrap element
             $result[] = $this->wrap($element);
         }
 

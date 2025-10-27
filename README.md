@@ -1,4 +1,5 @@
 # Clickhouse Query Builder
+
 [![Build Status](https://travis-ci.org/the-tinderbox/ClickhouseBuilder.svg?branch=master)](https://travis-ci.org/the-tinderbox/ClickhouseBuilder) [![Coverage Status](https://coveralls.io/repos/github/the-tinderbox/ClickhouseBuilder/badge.svg?branch=master)](https://coveralls.io/github/the-tinderbox/ClickhouseBuilder?branch=master)
 
 # Requirements
@@ -14,6 +15,7 @@ composer require the-tinderbox/clickhouse-builder
 ```
 
 # Usage
+
 For working query builder we must previously instantiate and pass in constructor `the-tinderbox/clickhouse-php-client`.
 
 ```php
@@ -23,6 +25,7 @@ $serverProvider = (new Tinderbox\Clickhouse\ServerProvider())->addServer($server
 $client = new Tinderbox\Clickhouse\Client($serverProvider);
 $builder = new Builder($client);
 ```
+
 After that we can build and perform sql queries.
 
 ### Select columns
@@ -47,6 +50,7 @@ $builder->select(function ($column) {
     $column->name('time')->sumIf('time', '>', 10);
 });
 ```
+
 Will be compiled in:
 
 ```sql
@@ -61,6 +65,7 @@ $builder->select(function ($column) {
     ->from('table');
 });
 ```
+
 Will be compiled in:
 
 ```sql
@@ -89,6 +94,7 @@ $2 = $builder->select(function ($column) {
 ```php
 $builder->select('column')->from('table', 'alias');
 ```
+
 Produce the following query:
 
 ```sql
@@ -254,6 +260,7 @@ and inserts data from `test.tsv` file into just created table.
 It's helpful if you want to fill some table with data to execute query and then drop it.
 
 ### Prewhere, where, having
+
 All example will be about where, but same behavior also is for prewhere and having.
 
 ```php
@@ -384,7 +391,7 @@ SELECT `column`, count() FROM `table` GROUP BY `attribute`
 $builder->from('table')->orderBy('column', 'asc', 'fr');
 ```
 
-*In the example above, third argument is optional*
+_In the example above, third argument is optional_
 
 ```sql
 SELECT *  FROM `table` ORDER BY `column` ASC COLLATE 'fr'
@@ -428,6 +435,7 @@ SELECT * FROM `table` LIMIT 100, 10
 ```
 
 ### Union ALL
+
 In `unionAll` method can be passed closure or builder instance. In case of closure inside will be passed
 builder instance.
 
@@ -453,9 +461,87 @@ $builder->from('table')->asyncWithQuery(function($query) {
 $builder->from('table')->asyncWithQuery($builder->from('table'));
 $builder->from('table')->asyncWithQuery()->from('table');
 ```
+
 This callings will produce the same behavior. Two queries which will be executed asynchronous.
 Now, if you call `get()` method, as result will be returned array, where numeric index correspond to the result of
 request with this number.
+
+### Prepared Statements (Parametrized Queries)
+
+The query builder supports prepared statements for secure and efficient query execution with dynamic values. This protects against SQL injection and allows ClickHouse to optimize repeated queries.
+
+#### Basic Usage
+
+The simplest approach is to pass PHP values directly with automatic type inference:
+
+```php
+// Simple comparison with automatic type inference
+$builder->from('users')
+    ->where('age', '>', 18)
+    ->where('status', '=', 'active')
+    ->get();
+```
+
+#### Using Parameter Class
+
+For explicit control over parameter names and types:
+
+```php
+use Tinderbox\ClickhouseBuilder\Query\Parameter;
+
+$builder->from('users')
+    ->where('id', '=', new Parameter('user_id', 42, 'UInt32'))
+    ->bind('user_id', 42, 'UInt32')
+    ->get();
+```
+
+#### Automatic Type Inference
+
+The builder automatically detects ClickHouse types from PHP values:
+
+```php
+$builder->where('count', '>', 100);              // UInt16
+$builder->where('price', '>=', 99.99);           // Float64
+$builder->where('name', '=', 'John');            // String
+$builder->where('active', '=', true);            // UInt8
+$builder->where('tags', 'IN', ['tag1', 'tag2']); // Array(String)
+```
+
+#### Setting Multiple Parameters
+
+```php
+$builder->from('orders')
+    ->where('total', '>=', 100)
+    ->where('status', 'IN', ['pending', 'processing'])
+    ->where('created_at', '>=', '2024-01-01')
+    ->setParameters([
+        'min_total' => 100,
+        'statuses' => ['pending', 'processing'],
+        'start_date' => '2024-01-01',
+    ], [
+        'min_total' => 'Float64',
+        'statuses' => 'Array(String)',
+        'start_date' => 'String',
+    ])
+    ->get();
+```
+
+#### Security Benefits
+
+Prepared statements provide protection against SQL injection:
+
+```php
+// ❌ UNSAFE - Do not do this:
+$userId = 123; // or from user input
+$builder->whereRaw("user_id = $userId");
+
+// ✅ SAFE - Use prepared statements:
+$builder->where('user_id', '=', $userId);
+// or
+$builder->where('user_id', '=', new Parameter('uid', $userId, 'UInt32'));
+```
+
+For comprehensive documentation about prepared statements, see [PREPARED_STATEMENTS.md](./PREPARED_STATEMENTS.md).
 
 ### Integrations
 
@@ -511,6 +597,7 @@ DB::connection('clickhouse')->query();
 ```
 
 or
+
 ```php
 'connections' => [
     'clickhouse' => [
