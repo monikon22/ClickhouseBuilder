@@ -362,6 +362,127 @@ $orders = DB::connection('clickhouse')
     ->get();
 ```
 
+## Laravel Connection: Laravel Placeholder Auto-Conversion
+
+When using the Laravel integration, the Connection class automatically converts Laravel-style placeholders (`?`) to ClickHouse parameter format (`{pN:Type}`). This allows you to write queries using familiar Laravel syntax while maintaining SQL injection protection.
+
+### Basic Usage with Laravel Syntax
+
+```php
+// Using Laravel-style placeholders - automatically converted to ClickHouse parameters
+$connection->insert('INSERT INTO users (id, name, email) VALUES (?, ?, ?)', [1, 'John', 'john@example.com']);
+
+// Using statement() method
+$connection->statement('CREATE TABLE IF NOT EXISTS logs (id UInt32, message String) Engine = Memory');
+
+// Using select() method with placeholders
+$result = $connection->select('SELECT * FROM users WHERE id = ? AND status = ?', [42, 'active']);
+```
+
+### How It Works
+
+1. **Detection**: The library automatically detects Laravel-style `?` placeholders
+2. **Type Inference**: It infers the ClickHouse type from the PHP value
+3. **Parameter Naming**: Creates sequential parameter names (p0, p1, p2, etc.)
+4. **Query Transformation**: Replaces `?` with `{pN:Type}` format
+5. **Value Formatting**: Formats values appropriately for ClickHouse
+
+### Automatic Type Detection
+
+```php
+// UInt8 - for integers 0-255
+$connection->insert('INSERT INTO stats (count) VALUES (?)', [100]);
+
+// Float64 - for floating point numbers
+$connection->insert('INSERT INTO metrics (value) VALUES (?)', [3.14]);
+
+// String - for text
+$connection->insert('INSERT INTO logs (message) VALUES (?)', ['User login']);
+
+// UInt8 (true/false) - for booleans
+$connection->insert('INSERT INTO flags (enabled) VALUES (?)', [true]);
+
+// Nullable(String) - for null values
+$connection->insert('INSERT INTO optional (data) VALUES (?)', [null]);
+```
+
+### Builder Integration
+
+The Builder classes automatically use prepared statements and pass parameters correctly:
+
+```php
+// Query Builder with where clauses
+$connection->table('users')
+    ->where('id', '=', 42)
+    ->where('status', '=', 'active')
+    ->delete();  // Automatically uses prepared statements
+
+// With multiple conditions
+$results = $connection->table('orders')
+    ->where('amount', '>', 100.00)
+    ->where('created_at', '>=', '2024-01-01')
+    ->select('*')
+    ->get();
+```
+
+### String Escaping
+
+The library automatically handles string escaping to prevent SQL injection:
+
+```php
+// Strings with quotes are properly escaped
+$connection->insert(
+    "INSERT INTO comments (text) VALUES (?)",
+    ["O'Reilly's book"]  // Automatically escaped
+);
+
+// Proper SQL injection prevention
+$connection->select(
+    "SELECT * FROM users WHERE name = ?",
+    ["'; DROP TABLE users; --"]  // Treated as plain string, not SQL
+);
+```
+
+### Mixed Usage
+
+You can mix prepared statements (from Builder) with Laravel placeholders (from Connection.insert/statement):
+
+```php
+// Direct connection method with placeholders
+$connection->insert('INSERT INTO logs (user_id, message) VALUES (?, ?)', [123, 'Login']);
+
+// Builder method with parameters
+$connection->table('users')
+    ->where('status', '=', 'pending')
+    ->delete();
+
+// Both use prepared statements internally
+```
+
+## Limitations
+
+- Parameters can only be used in specific SQL contexts (WHERE, HAVING, etc.)
+- Array parameters must use proper ClickHouse array syntax
+- The HTTP interface must support query parameters (available in ClickHouse by default)
+- Laravel placeholders (`?`) are converted on each query execution
+
+## References
+
+- [ClickHouse HTTP Interface Documentation](https://clickhouse.com/docs/interfaces/http#cli-queries-with-parameters)
+- [ClickHouse Data Types](https://clickhouse.com/docs/sql-reference/data-types/)
+- [SQL Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
+
+## Contributing
+
+If you find any issues or have suggestions for improvements, please open an issue or submit a pull request on GitHub.
+
+## License
+
+This feature is part of the ClickHouse Builder library and follows the same license as the main project.
+
+````
+```
+
 ## Limitations
 
 - Parameters can only be used in specific SQL contexts (WHERE, HAVING, etc.)
