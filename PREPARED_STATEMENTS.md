@@ -459,28 +459,39 @@ $connection->table('users')
 // Both use prepared statements internally
 ```
 
-## Limitations
+## Troubleshooting
 
-- Parameters can only be used in specific SQL contexts (WHERE, HAVING, etc.)
-- Array parameters must use proper ClickHouse array syntax
-- The HTTP interface must support query parameters (available in ClickHouse by default)
-- Laravel placeholders (`?`) are converted on each query execution
+### Missing Parameter Error: "Substitution `pN` is not set"
 
-## References
+If you encounter this error, it means the SQL query contains parameter placeholders (e.g., `{p0:String}`) but the parameters are not being passed to ClickHouse.
 
-- [ClickHouse HTTP Interface Documentation](https://clickhouse.com/docs/interfaces/http#cli-queries-with-parameters)
-- [ClickHouse Data Types](https://clickhouse.com/docs/sql-reference/data-types/)
-- [SQL Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
+**Common Causes:**
 
-## Contributing
+1. **Multiple WHERE clauses with expressions** - When using functions like `LOWER()` or `UPPER()` in WHERE clauses, ensure all parameters are properly transmitted through the Builder → Connection chain.
 
-If you find any issues or have suggestions for improvements, please open an issue or submit a pull request on GitHub.
+2. **Incorrect parameter format** - If bindings array has mixed key types (numeric and string keys together), parameters may not be recognized:
+   ```php
+   // CORRECT - all string keys matching p\d+ pattern
+   $bindings = ['p0' => 'value0', 'p1' => 'value1'];
+   ```
 
-## License
+3. **Direct SQL instead of Builder** - Parameters are only supported through the Builder interface, not raw SQL.
 
-This feature is part of the ClickHouse Builder library and follows the same license as the main project.
+**Debugging:**
 
-````
+Add logging to see what parameters are being passed:
+
+```php
+// Check what Builder generates
+$builder = $connection->table('users')
+    ->where('server', '=', 'US')
+    ->where($connection->raw('LOWER(player)'), 'LIKE', 'j%');
+
+var_dump($builder->toSql());        // SQL with {pN:Type} placeholders
+var_dump($builder->getBindings());  // Should have ['p0' => 'US', 'p1' => 'j%']
+
+// Then execute
+$result = $builder->get();
 ```
 
 ## Limitations
@@ -488,6 +499,7 @@ This feature is part of the ClickHouse Builder library and follows the same lice
 - Parameters can only be used in specific SQL contexts (WHERE, HAVING, etc.)
 - Array parameters must use proper ClickHouse array syntax
 - The HTTP interface must support query parameters (available in ClickHouse by default)
+- Laravel placeholders (`?`) are converted on each query execution
 
 ## References
 
