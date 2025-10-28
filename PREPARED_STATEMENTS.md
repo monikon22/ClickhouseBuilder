@@ -1,6 +1,6 @@
 # Prepared Statements Support for ClickHouse Builder
 
-This document describes the prepared statements (parametrized queries) support added to the ClickHouse Builder library for Laravel.
+This document describes the prepared statements (parameterized queries) support added to the ClickHouse Builder library for Laravel.
 
 ## Overview
 
