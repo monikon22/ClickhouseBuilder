@@ -724,6 +724,11 @@ abstract class BaseBuilder
         if ($column instanceof Closure) {
             $query = tp($this->newQuery(), $column);
 
+            // Merge parameters from nested query to parent query
+            foreach ($query->getParameters() as $name => $parameter) {
+                $this->parameters[$name] = $parameter;
+            }
+
             if (is_null($query->getFrom()) && empty($query->getColumns())) {
                 $expression->firstElement($query->{"get{$section}"}());
             } else {
@@ -776,7 +781,11 @@ abstract class BaseBuilder
                     [Operator::IN, Operator::NOT_IN]
                 )
             ) {
-                $value = new Tuple($value);
+                // Convert each array element to a parameter for Tuple
+                $tupleElements = array_map(function ($element) {
+                    return $this->convertToParameter($element);
+                }, $value);
+                $value = new Tuple($tupleElements);
                 $expression->secondElement($value);
             } else {
                 // Automatically convert scalar values to parameters (null will remain null)

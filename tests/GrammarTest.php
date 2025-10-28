@@ -434,4 +434,156 @@ class GrammarTest extends TestCase
         $sql = $grammar->compileDropTable('table', false);
         $this->assertEquals('DROP TABLE table', $sql);
     }
+
+    /**
+     * Test complex WHERE with parameters in grouped conditions.
+     * This tests the fix for: DB::Exception: Substitution `p1` is not set
+     */
+    public function testComplexWhereWithParametersInGroupedConditions()
+    {
+        $grammar = new Grammar();
+        $builder = $this->getBuilder();
+
+        $builder
+            ->from('player_metrics')
+            ->select('count(*) as count')
+            ->where('balance', '!=', 0)
+            ->where(function ($query) {
+                $query->where('player', 'LIKE', '%test%')
+                    ->orWhere('counterparty_nick', 'LIKE', '%test%');
+            });
+
+        $sql = $grammar->compileSelect($builder);
+        $bindings = $builder->getBindings();
+
+        // Check that SQL contains parameter placeholders
+        $this->assertStringContainsString('{p', $sql);
+
+        // Check that we have at least 3 parameters (p0, p1, p2 for the issue scenario)
+        $this->assertGreaterThanOrEqual(3, count($bindings));
+
+        // Check that all parameters are present in bindings
+        foreach ($bindings as $name => $value) {
+            $this->assertTrue(is_string($name));
+            $this->assertNotNull($value);
+        }
+
+        // Verify that the SQL uses parameter placeholders correctly
+        // Pattern: {name:Type}
+        $this->assertMatchesRegularExpression('/\{p\d+:[A-Za-z0-9()]+\}/', $sql);
+    }
+
+    /**
+     * Test complex WHERE with IN operator using parameters.
+     */
+    public function testComplexWhereWithInOperatorParameters()
+    {
+        $grammar = new Grammar();
+        $builder = $this->getBuilder();
+
+        $builder
+            ->from('users')
+            ->select('*')
+            ->where('balance', '!=', 10)
+            ->where(function ($query) {
+                $query->whereIn('status', ['active', 'pending'])
+                    ->orWhereIn('role', ['admin', 'moderator']);
+            });
+
+        $sql = $grammar->compileSelect($builder);
+        $bindings = $builder->getBindings();
+
+        // Check that we have parameters
+        $this->assertNotEmpty($bindings);
+
+        // All parameters should be retrievable
+        foreach ($bindings as $name => $value) {
+            $this->assertTrue(is_string($name));
+        }
+
+        // SQL should contain parameter placeholders
+        $this->assertStringContainsString('{p', $sql);
+    }
+
+    /**
+     * Test nested WHERE with multiple levels of grouping and parameters.
+     */
+    public function testNestedWhereWithMultipleLevelsAndParameters()
+    {
+        $grammar = new Grammar();
+        $builder = $this->getBuilder();
+
+        $builder
+            ->from('events')
+            ->select('*')
+            ->where('archived', '=', false)
+            ->where(function ($query) {
+                $query->where('type', '=', 'purchase')
+                    ->where(function ($subQuery) {
+                        $subQuery->where('amount', '>', 100)
+                            ->orWhere('amount', '<', 50);
+                    });
+            });
+
+        $sql = $grammar->compileSelect($builder);
+        $bindings = $builder->getBindings();
+
+        // Ensure all parameters are collected from nested queries
+        $this->assertNotEmpty($bindings);
+
+        // Should have at least 5 parameters: archived, type, amount (100), amount (50), and false
+        $this->assertGreaterThanOrEqual(4, count($bindings));
+
+        // All bindings should be accessible
+        foreach ($bindings as $name => $value) {
+            $this->assertTrue(is_string($name));
+            $this->assertNotNull($value);
+        }
+    }
+
+    /**
+     * Test the exact scenario from the issue: complex WHERE with NOT EQUAL and grouped LIKE conditions.
+     */
+    public function testExactScenarioFromIssue()
+    {
+        $grammar = new Grammar();
+        $builder = $this->getBuilder();
+
+        // Replicate: SELECT count(*) as count FROM `player_metrics` 
+        // WHERE `balance` != {p0:UInt8} AND (lower(player) LIKE {p1:String} OR lower(counterparty_nick) LIKE {p2:String})
+        $builder
+            ->from('player_metrics')
+            ->select('count(*) as count')
+            ->where('balance', '!=', 0)
+            ->where(function ($query) {
+                $query->where('player', 'LIKE', '%search%')
+                    ->orWhere('counterparty_nick', 'LIKE', '%search%');
+            });
+
+        $sql = $grammar->compileSelect($builder);
+        $bindings = $builder->getBindings();
+
+        // Verify SQL structure - count(*) gets wrapped but contains the key elements
+        $this->assertStringContainsString('FROM `player_metrics`', $sql);
+        $this->assertStringContainsString('WHERE', $sql);
+        $this->assertStringContainsString('`balance`', $sql);
+        $this->assertStringContainsString('AND', $sql);
+        $this->assertStringContainsString('LIKE', $sql);
+        $this->assertStringContainsString('OR', $sql);
+
+        // Verify parameters are collected
+        $this->assertGreaterThanOrEqual(
+            3,
+            count($bindings),
+            'Should have at least 3 parameters: p0 (!=0), p1 (LIKE player), p2 (LIKE counterparty_nick)'
+        );
+
+        // Verify all parameters have proper format
+        foreach ($bindings as $name => $value) {
+            $this->assertTrue(
+                preg_match('/^p\d+$/', $name) === 1,
+                "Parameter name should match pattern p\\d+: {$name}"
+            );
+        }
+    }
 }
