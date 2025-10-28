@@ -459,30 +459,14 @@ class Connection extends \Illuminate\Database\Connection
             return false;
         }
 
-        // If it's an associative array and all keys look like parameter names (p0, p1, etc.),
-        // then it's already ClickHouse-style parameters
-        $isAssociative = count(array_filter(array_keys($bindings), 'is_string')) > 0;
-        
-        if (!$isAssociative) {
-            return false;
-        }
-
-        // Check if all string keys match the p\d+ pattern
-        $allKeysMatch = true;
+        // Все ключи ДОЛЖНЫ быть строками, соответствующими паттерну p\d+
         foreach ($bindings as $key => $value) {
-            if (is_string($key)) {
-                if (!preg_match('/^p\d+$/', $key)) {
-                    $allKeysMatch = false;
-                    break;
-                }
-            } else {
-                // If we have numeric keys mixed with string keys, it's not ClickHouse format
-                $allKeysMatch = false;
-                break;
+            if (!is_string($key) || !preg_match('/^p\d+$/', $key)) {
+                return false;
             }
         }
 
-        return $allKeysMatch;
+        return true;
     }
 
     /**
