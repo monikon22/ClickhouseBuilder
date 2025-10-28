@@ -50,9 +50,9 @@ trait TwoElementsLogicExpressionsCompiler
 
                 if (!is_null($operator)) {
                     $result[] = $operator;
-                }
 
-                $result[] = $this->compileElement($secondElement);
+                    $result[] = $this->compileElement($secondElement);
+                }
             }
         }
 
@@ -80,7 +80,8 @@ trait TwoElementsLogicExpressionsCompiler
             $result[] = "({$this->compileTuple($element)})";
         } elseif ($element instanceof Column) {
             $result[] = $this->compileColumn($element);
-        } elseif (!is_null($element)) {
+        } else {
+            // Wrap element (including null)
             $result[] = $this->wrap($element);
         }
 

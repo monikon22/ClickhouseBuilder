@@ -63,7 +63,7 @@ class LaravelIntegrationTest extends TestCase
                         'username' => 'default',
                         'password' => '',
                         'options'  => [
-                            'timeout '=> 10,
+                            'timeout' => 10,
                         ],
                     ],
                     'server3'  => [
@@ -322,6 +322,7 @@ class LaravelIntegrationTest extends TestCase
         $connection->statement('drop table if exists test');
         $connection->statement('create table test (number UInt64) engine = Memory');
 
+        // Test with Laravel-style placeholders - should be auto-converted to ClickHouse parameters
         $result = $connection->insert('insert into test (number) values (?), (?), (?)', [0, 1, 2]);
         $this->assertTrue($result);
 
@@ -337,7 +338,7 @@ class LaravelIntegrationTest extends TestCase
         $connection->statement('create table test (number UInt64) engine = Memory');
 
         $result = $connection->insertFiles('test', ['number'], [
-            new FileFromString('0'.PHP_EOL.'1'.PHP_EOL.'2'),
+            new FileFromString('0' . PHP_EOL . '1' . PHP_EOL . '2'),
         ]);
         $this->assertTrue($result[0][0]);
 
@@ -438,8 +439,7 @@ class LaravelIntegrationTest extends TestCase
     {
         $connection = new Connection($this->getSimpleConfig());
         $this->expectException(NotSupportedException::class);
-        $connection->transaction(function () {
-        });
+        $connection->transaction(function () {});
     }
 
     public function test_connection_using()
@@ -455,6 +455,7 @@ class LaravelIntegrationTest extends TestCase
         $connection->onCluster('test')->using('server-1')->statement('create table test1 (number UInt8) Engine = Memory');
         $connection->onCluster('test')->using('server2')->statement('create table test2 (number UInt8) Engine = Memory');
 
+        // Test with Laravel-style placeholders - should be auto-converted
         $result = $connection->onCluster('test')->using('server-1')->insert('insert into test1 (number) values (?), (?), (?)', [0, 1, 2]);
         $this->assertTrue($result);
 
@@ -501,7 +502,7 @@ class LaravelIntegrationTest extends TestCase
         $connection->statement('create table test (number UInt64) engine = Memory');
 
         $result = $connection->table('test')->insertFiles(['number'], [
-            new FileFromString('0'.PHP_EOL.'1'.PHP_EOL.'2'),
+            new FileFromString('0' . PHP_EOL . '1' . PHP_EOL . '2'),
         ]);
         $this->assertTrue($result[0][0]);
 
@@ -512,7 +513,7 @@ class LaravelIntegrationTest extends TestCase
         $connection->statement('drop table if exists test');
         $connection->statement('create table test (number UInt64) engine = Memory');
 
-        $result = $connection->table('test')->insertFile(['number'], new FileFromString('0'.PHP_EOL.'1'.PHP_EOL.'2'));
+        $result = $connection->table('test')->insertFile(['number'], new FileFromString('0' . PHP_EOL . '1' . PHP_EOL . '2'));
         $this->assertTrue($result);
 
         $result = $connection->table('test')->get();
@@ -545,7 +546,7 @@ class LaravelIntegrationTest extends TestCase
         $connection->statement('create table test (number UInt64) engine = MergeTree order by number');
 
         $connection->table('test')->insertFiles(['number'], [
-            new FileFromString('0'.PHP_EOL.'1'.PHP_EOL.'2'),
+            new FileFromString('0' . PHP_EOL . '1' . PHP_EOL . '2'),
         ]);
 
         $result = $connection->table('test')->select($connection->raw('count() as count'))->get();
@@ -654,5 +655,52 @@ class LaravelIntegrationTest extends TestCase
         $this->assertEquals(20, $lastQueryStatistic->getBytes());
         $this->assertEquals(30, $lastQueryStatistic->getTime());
         $this->assertEquals(40, $lastQueryStatistic->getRowsBeforeLimitAtLeast());
+    }
+
+    public function test_builder_where_with_expression()
+    {
+        $connection = new Connection($this->getSimpleConfig());
+        $connection->statement('drop table if exists test_expr');
+        $connection->statement('create table test_expr (player String, server String) engine = Memory');
+
+        $connection->table('test_expr')->insert([
+            ['player' => 'John', 'server' => 'US'],
+            ['player' => 'jane', 'server' => 'EU'],
+            ['player' => 'bob', 'server' => 'ASIA'],
+        ]);
+
+        // Test multiple where clauses with expressions
+        $result = $connection->table('test_expr')
+            ->where('server', '=', 'US')
+            ->where($connection->raw('LOWER(player)'), 'LIKE', 'j%')
+            ->select('*')
+            ->get();
+
+        $this->assertEquals(1, count($result));
+        $this->assertEquals('John', $result[0]['player']);
+    }
+
+    public function test_builder_where_with_expression_and_final()
+    {
+        $connection = new Connection($this->getSimpleConfig());
+        $connection->statement('drop table if exists test_expr_final');
+        $connection->statement('create table test_expr_final (player String, server String) engine = ReplacingMergeTree() order by player');
+
+        $connection->table('test_expr_final')->insert([
+            ['player' => 'John', 'server' => 'US'],
+            ['player' => 'jane', 'server' => 'EU'],
+            ['player' => 'bob', 'server' => 'ASIA'],
+        ]);
+
+        // Test where with expression and final
+        $result = $connection->table('test_expr_final')
+            ->final()
+            ->where('server', '=', 'US')
+            ->where($connection->raw('LOWER(player)'), 'LIKE', 'j%')
+            ->select('*')
+            ->get();
+
+        $this->assertEquals(1, count($result));
+        $this->assertEquals('John', $result[0]['player']);
     }
 }

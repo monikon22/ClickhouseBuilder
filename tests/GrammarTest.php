@@ -263,19 +263,19 @@ class GrammarTest extends TestCase
         /*
          * With havings
          */
-        $select = $grammar->compileSelect($this->getBuilder()->having('a', '=', 'b'));
+        $select = $grammar->compileSelect($this->getBuilder()->having('a', '=', raw('\'b\'')));
         $this->assertEquals('SELECT * HAVING `a` = \'b\'', $select);
 
         /*
          * With wheres
          */
-        $select = $grammar->compileSelect($this->getBuilder()->where('a', '=', 'b'));
+        $select = $grammar->compileSelect($this->getBuilder()->where('a', '=', raw('\'b\'')));
         $this->assertEquals('SELECT * WHERE `a` = \'b\'', $select);
 
         /*
          * With pre wheres
          */
-        $select = $grammar->compileSelect($this->getBuilder()->preWhere('a', '=', 'b'));
+        $select = $grammar->compileSelect($this->getBuilder()->preWhere('a', '=', raw('\'b\'')));
         $this->assertEquals('SELECT * PREWHERE `a` = \'b\'', $select);
 
         /*
@@ -316,17 +316,17 @@ class GrammarTest extends TestCase
         $element->operator('=');
         $element->concatOperator(Operator::OR);
 
-        $select = $grammar->compileSelect($builder->having($element, '=', 'c'));
+        $select = $grammar->compileSelect($builder->having($element, '=', raw('\'c\'')));
         $this->assertEquals('SELECT * HAVING \'a\' = \'b\' = \'c\'', $select);
 
-        $select = $grammar->compileSelect($this->getBuilder()->having(new Tuple(['a', 'b']), '=', 'c'));
+        $select = $grammar->compileSelect($this->getBuilder()->having(new Tuple(['a', 'b']), '=', raw('\'c\'')));
         $this->assertEquals('SELECT * HAVING (\'a\', \'b\') = \'c\'', $select);
 
         $builder = $this->getBuilder();
         $column = new Column($builder);
         $column->name('a');
 
-        $select = $grammar->compileSelect($builder->having($column, '=', 'b'));
+        $select = $grammar->compileSelect($builder->having($column, '=', raw('\'b\'')));
         $this->assertEquals('SELECT * HAVING `a` = \'b\'', $select);
 
         $builder = $this->getBuilder();
@@ -336,7 +336,7 @@ class GrammarTest extends TestCase
         $element->operator('=');
         $element->concatOperator(Operator::OR);
 
-        $select = $grammar->compileSelect($this->getBuilder()->having([$element, $element], '=', 'b'));
+        $select = $grammar->compileSelect($this->getBuilder()->having([$element, $element], '=', raw('\'b\'')));
         $this->assertEquals('SELECT * HAVING (\'a\' = \'b\' OR \'a\' = \'b\') = \'b\'', $select);
     }
 
@@ -388,14 +388,14 @@ class GrammarTest extends TestCase
     {
         $grammar = new Grammar();
         $builder = $this->getBuilder();
-        $builder->from('table')->where('column', 1);
+        $builder->from('table')->where('column', raw('1'));
 
         $sql = $grammar->compileDelete($builder);
 
         $this->assertEquals('ALTER TABLE `table` DELETE WHERE `column` = 1', $sql);
 
         $builder = $this->getBuilder();
-        $builder->from('table')->where('column', 1)->onCluster('test');
+        $builder->from('table')->where('column', raw('1'))->onCluster('test');
 
         $sql = $grammar->compileDelete($builder);
 

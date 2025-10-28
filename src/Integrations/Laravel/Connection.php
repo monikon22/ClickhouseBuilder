@@ -324,9 +324,12 @@ class Connection extends \Illuminate\Database\Connection
      */
     public function select($query, $bindings = [], $tables = [])
     {
-        $result = $this->getClient()->readOne($query, $tables);
+        // Convert Laravel-style placeholders to ClickHouse parameters
+        [$query, $parameters] = $this->convertLaravelPlaceholders($query, $bindings);
 
-        $this->logQuery($result->getQuery()->getQuery(), [], $result->getStatistic()->getTime());
+        $result = $this->getClient()->readOne($query, $tables, [], $parameters);
+
+        $this->logQuery($result->getQuery()->getQuery(), $parameters, $result->getStatistic()->getTime());
 
         $this->setLastQueryStatistic($result->getStatistic());
 
@@ -343,7 +346,7 @@ class Connection extends \Illuminate\Database\Connection
     public function selectAsync(array $queries)
     {
         foreach ($queries as $i => $query) {
-            if (method_exists($query, 'toQuery')) {
+            if (is_object($query) && method_exists($query, 'toQuery')) {
                 $queries[$i] = $query->toQuery();
             }
         }
@@ -417,6 +420,210 @@ class Connection extends \Illuminate\Database\Connection
     }
 
     /**
+     * Convert Laravel-style placeholders (?) to ClickHouse parameter format ({pN:Type}).
+     * This allows using Laravel syntax with auto-conversion to prepared statements.
+     *
+     * If bindings is already an associative array with parameter names as keys,
+     * it's treated as pre-formatted ClickHouse parameters and returned as-is.
+     *
+     * @param string $query The SQL query with ? placeholders or {pN:Type} parameters
+     * @param array  $bindings The parameter values (indexed array) or pre-formatted ClickHouse parameters (associative array)
+     *
+     * @return array [$query, $parameters] where $parameters is an associative array for ClickHouse
+     */
+    protected function convertLaravelPlaceholders($query, $bindings = [])
+    {
+        if (empty($bindings)) {
+            return [$query, []];
+        }
+
+        // Check if bindings are already ClickHouse-style parameters (associative array with p0, p1, etc.)
+        if ($this->isClickhouseParametersArray($bindings)) {
+            return [$query, $bindings];
+        }
+
+        // Convert Laravel-style ? placeholders to ClickHouse {pN:Type} parameters
+        return $this->convertQuestionsToParameters($query, $bindings);
+    }
+
+    /**
+     * Check if the bindings array is already in ClickHouse parameter format.
+     *
+     * @param array $bindings
+     *
+     * @return bool
+     */
+    protected function isClickhouseParametersArray($bindings)
+    {
+        if (empty($bindings) || !is_array($bindings)) {
+            return false;
+        }
+
+        // If it's an associative array and all keys look like parameter names (p0, p1, etc.),
+        // then it's already ClickHouse-style parameters
+        $isAssociative = count(array_filter(array_keys($bindings), 'is_string')) > 0;
+        
+        if (!$isAssociative) {
+            return false;
+        }
+
+        // Check if all string keys match the p\d+ pattern
+        $allKeysMatch = true;
+        foreach ($bindings as $key => $value) {
+            if (is_string($key)) {
+                if (!preg_match('/^p\d+$/', $key)) {
+                    $allKeysMatch = false;
+                    break;
+                }
+            } else {
+                // If we have numeric keys mixed with string keys, it's not ClickHouse format
+                $allKeysMatch = false;
+                break;
+            }
+        }
+
+        return $allKeysMatch;
+    }
+
+    /**
+     * Convert ? placeholders to {pN:Type} format.
+     *
+     * @param string $query
+     * @param array  $bindings Indexed array of values
+     *
+     * @return array [$query, $parameters]
+     */
+    protected function convertQuestionsToParameters($query, $bindings)
+    {
+        $parameters = [];
+        $paramIndex = 0;
+        $queryLength = strlen($query);
+        $result = '';
+        $inString = false;
+        $stringChar = null;
+        $escapeNext = false;
+
+        for ($i = 0; $i < $queryLength; $i++) {
+            $char = $query[$i];
+
+            // Handle string escaping with backslash
+            if ($inString && $char === '\\' && !$escapeNext) {
+                $escapeNext = true;
+                $result .= $char;
+                continue;
+            }
+
+            // Handle string boundaries
+            if ($char === "'" || $char === '"') {
+                if (!$inString) {
+                    $inString = true;
+                    $stringChar = $char;
+                } elseif ($char === $stringChar) {
+                    // Check for escaped quote
+                    if ($i + 1 < $queryLength && $query[$i + 1] === $stringChar) {
+                        $result .= $char . $char;
+                        $i++;
+                        continue;
+                    } elseif (!$escapeNext) {
+                        $inString = false;
+                    }
+                }
+                $result .= $char;
+                $escapeNext = false;
+            } elseif (!$inString && $char === '?' && $paramIndex < count($bindings)) {
+                // Replace ? with {pN:Type} parameter
+                $value = $bindings[$paramIndex];
+                $paramName = 'p' . $paramIndex;
+
+                // Determine the type based on the value
+                $type = $this->getParameterType($value);
+
+                // Store the parameter with auto-conversion
+                $parameters[$paramName] = $this->formatParameter($value, $type);
+
+                $result .= '{' . $paramName . ':' . $type . '}';
+                $paramIndex++;
+            } else {
+                $result .= $char;
+                $escapeNext = false;
+            }
+        }
+
+        // Validate that all bindings were consumed
+        if ($paramIndex < count($bindings)) {
+            throw new \InvalidArgumentException(
+                'Too many bindings: expected ' . $paramIndex . ', got ' . count($bindings)
+            );
+        }
+
+        // Validate that all placeholders were replaced
+        if (strpos($result, '?') !== false) {
+            throw new \InvalidArgumentException('Not enough bindings to replace all placeholders.');
+        }
+
+        return [$result, $parameters];
+    }
+
+    /**
+     * Determine the ClickHouse parameter type based on PHP value.
+     *
+     * @param mixed $value
+     *
+     * @return string
+     */
+    protected function getParameterType($value)
+    {
+        if (is_bool($value)) {
+            return 'UInt8';
+        } elseif (is_int($value)) {
+            if ($value >= 0) {
+                if ($value <= 255) {
+                    return 'UInt8';
+                } elseif ($value <= 65535) {
+                    return 'UInt16';
+                } elseif ($value <= 4294967295) {
+                    return 'UInt32';
+                } else {
+                    return 'UInt64';
+                }
+            } else {
+                if ($value >= -128 && $value <= 127) {
+                    return 'Int8';
+                } elseif ($value >= -32768 && $value <= 32767) {
+                    return 'Int16';
+                } elseif ($value >= -2147483648 && $value <= 2147483647) {
+                    return 'Int32';
+                } else {
+                    return 'Int64';
+                }
+            }
+        } elseif (is_float($value)) {
+            return 'Float64';
+        } elseif (is_null($value)) {
+            return 'Nullable(String)';
+        } else {
+            return 'String';
+        }
+    }
+
+    /**
+     * Format parameter value for ClickHouse.
+     *
+     * @param mixed  $value
+     * @param string $type
+     *
+     * @return mixed
+     */
+    protected function formatParameter($value, $type)
+    {
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+        // Для параметров ClickHouse по HTTP возвращаем сырые значения.
+        return $value;
+    }
+
+    /**
      * Run an insert statement against the database.
      *
      * @param string $query
@@ -428,7 +635,10 @@ class Connection extends \Illuminate\Database\Connection
     {
         $startTime = microtime(true);
 
-        $result = $this->getClient()->writeOne($query);
+        // Convert Laravel-style placeholders to ClickHouse parameters
+        [$query, $parameters] = $this->convertLaravelPlaceholders($query, $bindings);
+
+        $result = $this->getClient()->writeOne($query, [], [], $parameters);
 
         $this->logQuery($query, $bindings, microtime(true) - $startTime);
 
@@ -450,7 +660,7 @@ class Connection extends \Illuminate\Database\Connection
     {
         $result = $this->getClient()->writeFiles($table, $columns, $files, $format, [], $concurrency);
 
-        $this->logQuery('INSERT '.count($files)." FILES INTO {$table}", []);
+        $this->logQuery('INSERT ' . count($files) . " FILES INTO {$table}", []);
 
         return $result;
     }
@@ -478,7 +688,7 @@ class Connection extends \Illuminate\Database\Connection
      */
     public function delete($query, $bindings = [])
     {
-        return $this->statement($query);
+        return $this->statement($query, $bindings);
     }
 
     /**
@@ -520,7 +730,10 @@ class Connection extends \Illuminate\Database\Connection
     {
         $start = microtime(true);
 
-        $result = $this->getClient()->writeOne($query);
+        // Convert Laravel-style placeholders to ClickHouse parameters
+        [$query, $parameters] = $this->convertLaravelPlaceholders($query, $bindings);
+
+        $result = $this->getClient()->writeOne($query, [], [], $parameters);
 
         $this->logQuery($query, $bindings, microtime(true) - $start);
 

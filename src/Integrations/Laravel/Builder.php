@@ -47,7 +47,7 @@ class Builder extends BaseBuilder
         if (!empty($this->async)) {
             return $this->connection->selectAsync($this->toAsyncQueries());
         } else {
-            return $this->connection->select($this->toSql(), [], $this->getFiles());
+            return $this->connection->select($this->toSql(), $this->getBindings(), $this->getFiles());
         }
     }
 
@@ -60,7 +60,7 @@ class Builder extends BaseBuilder
      */
     public function toQuery(array $settings = []): Query
     {
-        return new Query($this->connection->getServer(), $this->toSql(), $this->getFiles(), $settings);
+        return new Query($this->connection->getServer(), $this->toSql(), $this->getFiles(), $settings, $this->getBindings());
     }
 
     /**
@@ -170,7 +170,7 @@ class Builder extends BaseBuilder
             }
         }
 
-        return $this->connection->insert($this->grammar->compileInsert($this, $values));
+        return $this->connection->insert($this->grammar->compileInsert($this, $values), $this->getBindings());
     }
 
     /**
@@ -182,7 +182,7 @@ class Builder extends BaseBuilder
      */
     public function delete()
     {
-        return $this->connection->delete($this->grammar->compileDelete($this));
+        return $this->connection->delete($this->grammar->compileDelete($this), $this->getBindings());
     }
 
     /**

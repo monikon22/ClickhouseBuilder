@@ -73,15 +73,15 @@ class Grammar
         $sql = [];
 
         foreach ($this->selectComponents as $component) {
-            $compileMethod = 'compile'.ucfirst($component).'Component';
-            $component = 'get'.ucfirst($component);
+            $compileMethod = 'compile' . ucfirst($component) . 'Component';
+            $component = 'get' . ucfirst($component);
 
             if (!is_null($query->$component()) && !empty($query->$component())) {
                 $sql[$component] = $this->$compileMethod($query, $query->$component());
             }
         }
 
-        return trim('SELECT '.trim(implode(' ', $sql)));
+        return trim('SELECT ' . trim(implode(' ', $sql)));
     }
 
     /**
@@ -128,7 +128,7 @@ class Grammar
             $result[] = "({$columns})";
         }
 
-        $result[] = 'FORMAT '.$format;
+        $result[] = 'FORMAT ' . $format;
 
         if ($format == Format::VALUES) {
             $result[] = $this->compileInsertValues($values);
@@ -159,8 +159,8 @@ class Grammar
         $extraOptions = $extraOptions ?? '';
 
         return 'CREATE TABLE '
-            .($ifNotExists ? 'IF NOT EXISTS ' : '')
-            .rtrim("{$tableName} {$onCluster} ({$this->compileTableStructure($structure)}) ENGINE = {$engine} {$extraOptions}");
+            . ($ifNotExists ? 'IF NOT EXISTS ' : '')
+            . rtrim("{$tableName} {$onCluster} ({$this->compileTableStructure($structure)}) ENGINE = {$engine} {$extraOptions}");
     }
 
     /**
@@ -180,7 +180,7 @@ class Grammar
 
         $onCluster = $clusterName === null ? '' : "ON CLUSTER {$clusterName}";
 
-        return trim('DROP TABLE '.($ifExists ? 'IF EXISTS ' : '')."{$tableName} {$onCluster}");
+        return trim('DROP TABLE ' . ($ifExists ? 'IF EXISTS ' : '') . "{$tableName} {$onCluster}");
     }
 
     /**
@@ -195,7 +195,7 @@ class Grammar
         $result = [];
 
         foreach ($structure as $column => $type) {
-            $result[] = $column.' '.$type;
+            $result[] = $column . ' ' . $type;
         }
 
         return implode(', ', $result);
@@ -204,9 +204,9 @@ class Grammar
     public function compileInsertValues($values)
     {
         return implode(', ', array_map(function ($value) {
-            return '('.implode(', ', array_map(function ($value) {
+            return '(' . implode(', ', array_map(function ($value) {
                 return $this->wrap($value);
-            }, $value)).')';
+            }, $value)) . ')';
         }, $values));
     }
 
@@ -232,7 +232,7 @@ class Grammar
         $sql .= ' DELETE';
 
         if (!is_null($query->getWheres()) && !empty($query->getWheres())) {
-            $sql .= " {$this->compileWheresComponent($query, $query->getWheres())}";
+            $sql .= " {$this->compileWheresComponent($query,$query->getWheres())}";
         } else {
             throw GrammarException::missedWhereForDelete();
         }
@@ -243,13 +243,15 @@ class Grammar
     /**
      * Convert value in literal.
      *
-     * @param string|Expression|Identifier|array $value
+     * @param string|Expression|Identifier|array|Parameter $value
      *
      * @return string|array|null|int
      */
     public function wrap($value)
     {
-        if ($value instanceof Expression) {
+        if ($value instanceof Parameter) {
+            return $value->getPlaceholder();
+        } elseif ($value instanceof Expression) {
             return $value->getValue();
         } elseif (is_array($value)) {
             return array_map([$this, 'wrap'], $value);
@@ -281,7 +283,7 @@ class Grammar
                 return $value;
             }
 
-            return '`'.str_replace('`', '``', $value).'`';
+            return '`' . str_replace('`', '``', $value) . '`';
         } elseif (is_numeric($value)) {
             return $value;
         } elseif (is_null($value)) {
