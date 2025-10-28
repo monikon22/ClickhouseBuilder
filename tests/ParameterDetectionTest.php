@@ -114,7 +114,7 @@ class ParameterDetectionTest extends TestCase
             'p3' => '2024-01-01',
         ];
 
-        [$query, $result] = $method->invoke($connection,
+        list(, $result) = $method->invoke($connection,
             'SELECT * FROM logs WHERE server={p0:String} AND player LIKE {p1:String} AND status={p2:String} AND date>={p3:String}',
             $params
         );

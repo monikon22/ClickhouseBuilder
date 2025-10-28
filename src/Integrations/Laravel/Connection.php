@@ -501,11 +501,19 @@ class Connection extends \Illuminate\Database\Connection
         $result = '';
         $inString = false;
         $stringChar = null;
+        $escapeNext = false;
 
         for ($i = 0; $i < $queryLength; $i++) {
             $char = $query[$i];
 
-            // Handle string escaping
+            // Handle string escaping with backslash
+            if ($inString && $char === '\\' && !$escapeNext) {
+                $escapeNext = true;
+                $result .= $char;
+                continue;
+            }
+
+            // Handle string boundaries
             if ($char === "'" || $char === '"') {
                 if (!$inString) {
                     $inString = true;
@@ -516,11 +524,12 @@ class Connection extends \Illuminate\Database\Connection
                         $result .= $char . $char;
                         $i++;
                         continue;
-                    } else {
+                    } elseif (!$escapeNext) {
                         $inString = false;
                     }
                 }
                 $result .= $char;
+                $escapeNext = false;
             } elseif (!$inString && $char === '?' && $paramIndex < count($bindings)) {
                 // Replace ? with {pN:Type} parameter
                 $value = $bindings[$paramIndex];
@@ -536,7 +545,20 @@ class Connection extends \Illuminate\Database\Connection
                 $paramIndex++;
             } else {
                 $result .= $char;
+                $escapeNext = false;
             }
+        }
+
+        // Validate that all bindings were consumed
+        if ($paramIndex < count($bindings)) {
+            throw new \InvalidArgumentException(
+                'Too many bindings: expected ' . $paramIndex . ', got ' . count($bindings)
+            );
+        }
+
+        // Validate that all placeholders were replaced
+        if (strpos($result, '?') !== false) {
+            throw new \InvalidArgumentException('Not enough bindings to replace all placeholders.');
         }
 
         return [$result, $parameters];
@@ -578,11 +600,10 @@ class Connection extends \Illuminate\Database\Connection
      */
     protected function formatParameter($value, $type)
     {
-        if ($type === 'String' && !is_null($value)) {
-            // Escape single quotes for strings
-            return str_replace("'", "''", (string) $value);
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
         }
-
+        // Для параметров ClickHouse по HTTP возвращаем сырые значения.
         return $value;
     }
 

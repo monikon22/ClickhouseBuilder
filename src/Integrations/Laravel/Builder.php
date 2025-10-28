@@ -60,7 +60,7 @@ class Builder extends BaseBuilder
      */
     public function toQuery(array $settings = []): Query
     {
-        return new Query($this->connection->getServer(), $this->toSql(), $this->getFiles(), $settings);
+        return new Query($this->connection->getServer(), $this->toSql(), $this->getFiles(), $settings, $this->getBindings());
     }
 
     /**

@@ -63,7 +63,7 @@ class LaravelIntegrationTest extends TestCase
                         'username' => 'default',
                         'password' => '',
                         'options'  => [
-                            'timeout ' => 10,
+                            'timeout' => 10,
                         ],
                     ],
                     'server3'  => [

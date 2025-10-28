@@ -19,7 +19,6 @@ function example1_basic_usage()
         ->table('users')
         ->select('id', 'name', 'email')
         ->where('id', '=', new Parameter('user_id', $userId, 'UInt32'))
-        ->bind('user_id', $userId, 'UInt32')
         ->get();
 
     return $users;
@@ -38,14 +37,6 @@ function example2_multiple_parameters()
         ->where('age', '>=', new Parameter('min_age', $minAge, 'UInt8'))
         ->where('age', '<=', new Parameter('max_age', $maxAge, 'UInt8'))
         ->where('country', '=', new Parameter('country', $country, 'String'))
-        ->setParameters([
-            'min_age' => $minAge,
-            'max_age' => $maxAge,
-            'country' => $country,
-        ], [
-            'min_age' => 'UInt8',
-            'max_age' => 'UInt8',
-        ])
         ->get();
 
     return $users;
@@ -60,7 +51,6 @@ function example3_array_parameters()
         ->table('orders')
         ->select('order_id', 'status', 'total')
         ->where('status', 'IN', new Parameter('statuses', $statusList, 'Array(String)'))
-        ->bind('statuses', $statusList, 'Array(String)')
         ->get();
 
     return $orders;
@@ -77,10 +67,6 @@ function example4_date_range()
         ->select('event_id', 'event_type', 'created_at')
         ->where('created_at', '>=', new Parameter('start_date', $startDate, 'String'))
         ->where('created_at', '<=', new Parameter('end_date', $endDate, 'String'))
-        ->setParameters([
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-        ])
         ->get();
 
     return $events;
@@ -94,29 +80,16 @@ function example5_complex_query()
     $categories = ['electronics', 'computers', 'phones'];
     $minStock = 10;
 
-    $products = DB::connection('clickhouse')
-        ->table('products')
-        ->select('product_id', 'name', 'price', 'category', 'stock')
-        ->where('price', '>=', new Parameter('min_price', $minPrice, 'Float64'))
-        ->where('price', '<=', new Parameter('max_price', $maxPrice, 'Float64'))
-        ->where('category', 'IN', new Parameter('categories', $categories, 'Array(String)'))
-        ->where('stock', '>=', new Parameter('min_stock', $minStock, 'UInt32'))
-        ->setParameters([
-            'min_price' => $minPrice,
-            'max_price' => $maxPrice,
-            'categories' => $categories,
-            'min_stock' => $minStock,
-        ], [
-            'min_price' => 'Float64',
-            'max_price' => 'Float64',
-            'categories' => 'Array(String)',
-            'min_stock' => 'UInt32',
-        ])
-        ->orderBy('price', 'asc')
-        ->limit(100)
-        ->get();
-
-    return $products;
+$products = DB::connection('clickhouse')
+    ->table('products')
+    ->select('product_id', 'name', 'price', 'category', 'stock')
+    ->where('price', '>=', new Parameter('min_price', $minPrice, 'Float64'))
+    ->where('price', '<=', new Parameter('max_price', $maxPrice, 'Float64'))
+    ->where('category', 'IN', new Parameter('categories', $categories, 'Array(String)'))
+    ->where('stock', '>=', new Parameter('min_stock', $minStock, 'UInt32'))
+    ->orderBy('price', 'asc')
+    ->limit(100)
+    ->get();    return $products;
 }
 
 // Example 6: Automatic type inference
@@ -129,11 +102,7 @@ function example6_auto_type_inference()
         ->where('id', '=', new Parameter('id', 123))          // Infers UInt8
         ->where('name', '=', new Parameter('name', 'Alice'))  // Infers String
         ->where('active', '=', new Parameter('active', true)) // Infers UInt8
-        ->setParameters([
-            'id' => 123,
-            'name' => 'Alice',
-            'active' => true,
-        ]);
+;
 
     return $builder->get();
 }
@@ -151,14 +120,12 @@ function example7_reusing_parameters()
         ->table('orders')
         ->select('*')
         ->where('user_id', '=', $userIdParam)
-        ->bind('user_id', $userId, 'UInt32')
         ->get();
 
     $payments = DB::connection('clickhouse')
         ->table('payments')
         ->select('*')
         ->where('user_id', '=', $userIdParam)
-        ->bind('user_id', $userId, 'UInt32')
         ->get();
 
     return [
