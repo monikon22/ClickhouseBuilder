@@ -366,6 +366,8 @@ $orders = DB::connection('clickhouse')
 
 When using the Laravel integration, the Connection class automatically converts Laravel-style placeholders (`?`) to ClickHouse parameter format (`{pN:Type}`). This allows you to write queries using familiar Laravel syntax while maintaining SQL injection protection.
 
+> **Note:** Laravel-style placeholder auto-conversion is only supported through the Connection helper methods (`insert()`, `select()`, `statement()`, `delete()`) and the Query Builder. Direct raw SQL execution outside of these methods will not have placeholders converted.
+
 ### Basic Usage with Laravel Syntax
 
 ```php
@@ -475,7 +477,7 @@ If you encounter this error, it means the SQL query contains parameter placehold
    $bindings = ['p0' => 'value0', 'p1' => 'value1'];
    ```
 
-3. **Direct SQL instead of Builder** - Parameters are only supported through the Builder interface, not raw SQL.
+3. **Direct raw SQL without Connection methods** - Parameters are only supported through the Builder interface and Connection helper methods (`insert()`, `select()`, `statement()`). Raw SQL executed through other means will not have placeholder conversion.
 
 **Debugging:**
 

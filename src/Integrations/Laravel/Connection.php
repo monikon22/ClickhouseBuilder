@@ -576,10 +576,26 @@ class Connection extends \Illuminate\Database\Connection
         if (is_bool($value)) {
             return 'UInt8';
         } elseif (is_int($value)) {
-            if ($value < 0) {
-                return $value < -2147483648 ? 'Int64' : 'Int32';
+            if ($value >= 0) {
+                if ($value <= 255) {
+                    return 'UInt8';
+                } elseif ($value <= 65535) {
+                    return 'UInt16';
+                } elseif ($value <= 4294967295) {
+                    return 'UInt32';
+                } else {
+                    return 'UInt64';
+                }
             } else {
-                return $value > 4294967295 ? 'UInt64' : 'UInt32';
+                if ($value >= -128 && $value <= 127) {
+                    return 'Int8';
+                } elseif ($value >= -32768 && $value <= 32767) {
+                    return 'Int16';
+                } elseif ($value >= -2147483648 && $value <= 2147483647) {
+                    return 'Int32';
+                } else {
+                    return 'Int64';
+                }
             }
         } elseif (is_float($value)) {
             return 'Float64';
