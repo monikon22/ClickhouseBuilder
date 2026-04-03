@@ -2186,14 +2186,14 @@ abstract class BaseBuilder
      * Merge an array of parameters into the existing parameters.
      * Existing parameters with the same name will not be overwritten.
      *
-     * @param array $bindings Associative array of parameter names and values
-     * @param bool  $overwrite Whether to overwrite existing parameters with the same name
+     * @param array|BaseBuilder $bindings Associative array of parameter names and values
+     * @param bool $overwrite Whether to overwrite existing parameters with the same name
      *
      * @return $this
      */
-    public function mergeBindings(array|Builder $bindings, bool $overwrite = false)
+    public function mergeBindings(array|BaseBuilder $bindings, bool $overwrite = false)
     {
-        if ($bindings instanceof Builder) {
+        if ($bindings instanceof BaseBuilder) {
             $bindings = $bindings->getParameters();
         }
 
