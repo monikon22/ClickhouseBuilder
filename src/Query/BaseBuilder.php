@@ -2191,8 +2191,12 @@ abstract class BaseBuilder
      *
      * @return $this
      */
-    public function mergeBindings(array $bindings, bool $overwrite = false)
+    public function mergeBindings(array|Builder $bindings, bool $overwrite = false)
     {
+        if ($bindings instanceof Builder) {
+            $bindings = $bindings->getParameters();
+        }
+
         foreach ($bindings as $name => $value) {
             if (!isset($this->parameters[$name]) || $overwrite) {
                 $this->parameters[$name] = $value;
