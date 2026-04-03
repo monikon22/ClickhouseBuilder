@@ -2183,6 +2183,26 @@ abstract class BaseBuilder
     }
 
     /**
+     * Merge an array of parameters into the existing parameters.
+     * Existing parameters with the same name will not be overwritten.
+     *
+     * @param array $bindings Associative array of parameter names and values
+     * @param bool  $overwrite Whether to overwrite existing parameters with the same name
+     *
+     * @return $this
+     */
+    public function mergeBindings(array $bindings, bool $overwrite = false)
+    {
+        foreach ($bindings as $name => $value) {
+            if (!isset($this->parameters[$name]) || $overwrite) {
+                $this->parameters[$name] = $value;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Set multiple parameters at once.
      *
      * @param array $parameters Associative array of parameter names and values
