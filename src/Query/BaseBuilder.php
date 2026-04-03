@@ -543,31 +543,31 @@ abstract class BaseBuilder
         }
 
         /*
+        * If using was given, then merge it with using given before, in closure
+        */
+        if (!is_null($using)) {
+            $join->addUsing($using);
+        }
+
+        if (!is_null($type) && is_null($join->getType())) {
+            $join->type($type);
+        }
+
+        if (!is_null($alias) && is_null($join->getAlias())) {
+            $join->as($alias);
+        }
+
+        $join->distributed($global);
+
+        /*
          * If strict given as closure, then we assume that user wants to set up join clause in closure, otherwise - we set up parameters based on given arguments
          */
         if ($strictOrCallback instanceof Closure) {
             $strictOrCallback($join);
         } else {
-            /*
-            * If using was given, then merge it with using given before, in closure
-            */
-            if (!is_null($using)) {
-                $join->addUsing($using);
-            }
-
             if (!is_null($strictOrCallback) && is_null($join->getStrict())) {
                 $join->strict($strictOrCallback);
             }
-
-            if (!is_null($type) && is_null($join->getType())) {
-                $join->type($type);
-            }
-
-            if (!is_null($alias) && is_null($join->getAlias())) {
-                $join->as($alias);
-            }
-
-            $join->distributed($global);
         }
 
         if (!is_null($join->getSubQuery())) {
