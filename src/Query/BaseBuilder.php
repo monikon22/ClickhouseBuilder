@@ -499,7 +499,7 @@ abstract class BaseBuilder
      * Add join to query.
      *
      * @param string|self|Closure $table  Table to select from, also may be a sub-query
-     * @param string|null         $strict All or any
+     * @param string|Closure|null $strict All or any
      * @param string|null         $type   Left or inner
      * @param array|null          $using  Columns to use for join
      * @param bool                $global Global distribution for right table
@@ -509,7 +509,7 @@ abstract class BaseBuilder
      */
     public function join(
         $table,
-        string $strict = null,
+        string|Closure $strictOrCallback = null,
         string $type = null,
         array $using = null,
         bool $global = false,
@@ -543,25 +543,32 @@ abstract class BaseBuilder
         }
 
         /*
-         * If using was given, then merge it with using given before, in closure
+         * If strict given as closure, then we assume that user wants to set up join clause in closure, otherwise - we set up parameters based on given arguments
          */
-        if (!is_null($using)) {
-            $join->addUsing($using);
-        }
+        if ($strictOrCallback instanceof Closure) {
+            $strictOrCallback($join);
+        } else {
+            /*
+            * If using was given, then merge it with using given before, in closure
+            */
+            if (!is_null($using)) {
+                $join->addUsing($using);
+            }
 
-        if (!is_null($strict) && is_null($join->getStrict())) {
-            $join->strict($strict);
-        }
+            if (!is_null($strictOrCallback) && is_null($join->getStrict())) {
+                $join->strict($strictOrCallback);
+            }
 
-        if (!is_null($type) && is_null($join->getType())) {
-            $join->type($type);
-        }
+            if (!is_null($type) && is_null($join->getType())) {
+                $join->type($type);
+            }
 
-        if (!is_null($alias) && is_null($join->getAlias())) {
-            $join->as($alias);
-        }
+            if (!is_null($alias) && is_null($join->getAlias())) {
+                $join->as($alias);
+            }
 
-        $join->distributed($global);
+            $join->distributed($global);
+        }
 
         if (!is_null($join->getSubQuery())) {
             $join->query($join->getSubQuery());
@@ -578,16 +585,16 @@ abstract class BaseBuilder
      * Alias for join method, but without specified strictness
      *
      * @param string|self|Closure $table
-     * @param string|null         $strict
+     * @param string|Closure|null $strictOrCallback
      * @param array|null          $using
      * @param bool                $global
      * @param string|null         $alias
      *
      * @return static
      */
-    public function leftJoin($table, string $strict = null, array $using = null, bool $global = false, ?string $alias = null)
+    public function leftJoin($table, string|Closure $strictOrCallback = null, array $using = null, bool $global = false, ?string $alias = null)
     {
-        return $this->join($table, $strict ?? JoinStrict::ALL, JoinType::LEFT, $using, $global, $alias);
+        return $this->join($table, $strictOrCallback ?? JoinStrict::ALL, JoinType::LEFT, $using, $global, $alias);
     }
 
     /**
@@ -596,16 +603,16 @@ abstract class BaseBuilder
      * Alias for join method, but without specified strictness
      *
      * @param string|self|Closure $table
-     * @param string|null         $strict
+     * @param string|Closure|null $strictOrCallback
      * @param array|null          $using
      * @param bool                $global
      * @param string|null         $alias
      *
      * @return static
      */
-    public function innerJoin($table, string $strict = null, array $using = null, bool $global = false, ?string $alias = null)
+    public function innerJoin($table, string|Closure $strictOrCallback = null, array $using = null, bool $global = false, ?string $alias = null)
     {
-        return $this->join($table, $strict ?? JoinStrict::ALL, JoinType::INNER, $using, $global, $alias);
+        return $this->join($table, $strictOrCallback ?? JoinStrict::ALL, JoinType::INNER, $using, $global, $alias);
     }
 
     /**
