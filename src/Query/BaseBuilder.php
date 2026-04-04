@@ -284,6 +284,10 @@ abstract class BaseBuilder
                 }
             }
 
+            if ($value instanceof Expression) {
+                $this->mergeBindings($value->getBindings());
+            }
+
             if (is_int($column)) {
                 $column = $value;
                 $value = null;
