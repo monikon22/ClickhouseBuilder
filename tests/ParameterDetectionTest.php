@@ -126,4 +126,32 @@ class ParameterDetectionTest extends TestCase
         $this->assertEquals('active', $result['p2']);
         $this->assertEquals('2024-01-01', $result['p3']);
     }
+
+    /**
+     * Test conversion with ClickHouse substitution placeholders.
+     */
+    public function test_clickhouse_named_placeholders_are_passed_through()
+    {
+        $connection = new Connection($this->getSimpleConfig());
+
+        $reflection = new \ReflectionClass($connection);
+        $method = $reflection->getMethod('convertLaravelPlaceholders');
+        $method->setAccessible(true);
+
+        $params = [
+            'royalty' => 12.5,
+            'label' => 'music',
+        ];
+
+        [$query, $result] = $method->invoke(
+            $connection,
+            'SELECT * FROM tracks WHERE royalty > {royalty:Float64} AND label = {label:String}',
+            $params
+        );
+
+        $this->assertEquals('SELECT * FROM tracks WHERE royalty > {royalty:Float64} AND label = {label:String}', $query);
+        $this->assertEquals(2, count($result));
+        $this->assertEquals(12.5, $result['royalty']);
+        $this->assertEquals('music', $result['label']);
+    }
 }

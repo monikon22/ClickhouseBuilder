@@ -442,6 +442,11 @@ class Connection extends \Illuminate\Database\Connection
             return [$query, $bindings];
         }
 
+        // Support ClickHouse substitution syntax like {royalty:Float64}
+        if ($this->containsClickhouseSubstitutions($query) && $this->isAssociativeArray($bindings)) {
+            return $this->convertClickhouseSubstitutionsToParameters($query, $bindings);
+        }
+
         // Convert Laravel-style ? placeholders to ClickHouse {pN:Type} parameters
         return $this->convertQuestionsToParameters($query, $bindings);
     }
@@ -483,6 +488,115 @@ class Connection extends \Illuminate\Database\Connection
         }
 
         return $allKeysMatch;
+    }
+
+    /**
+     * Check whether an array is associative.
+     *
+     * @param array $array
+     *
+     * @return bool
+     */
+    protected function isAssociativeArray(array $array): bool
+    {
+        return array_keys($array) !== range(0, count($array) - 1);
+    }
+
+    /**
+     * Check whether the query contains ClickHouse substitution placeholders.
+     *
+     * @param string $query
+     *
+     * @return bool
+     */
+    protected function containsClickhouseSubstitutions($query): bool
+    {
+        return (bool) preg_match('/\{[a-zA-Z_][a-zA-Z0-9_]*:[^}]+\}/', $query);
+    }
+
+    /**
+     * Convert ClickHouse substitution placeholders like {royalty:Float64}.
+     *
+     * @param string $query
+     * @param array  $bindings Associative array of parameter values
+     *
+     * @return array [$query, $parameters]
+     */
+    protected function convertClickhouseSubstitutionsToParameters($query, $bindings)
+    {
+        $parameters = [];
+        $result = '';
+        $queryLength = strlen($query);
+        $inString = false;
+        $stringChar = null;
+        $escapeNext = false;
+
+        for ($i = 0; $i < $queryLength; $i++) {
+            $char = $query[$i];
+
+            if ($inString && $char === '\\' && !$escapeNext) {
+                $escapeNext = true;
+                $result .= $char;
+                continue;
+            }
+
+            if ($char === "'" || $char === '"') {
+                if (!$inString) {
+                    $inString = true;
+                    $stringChar = $char;
+                } elseif ($char === $stringChar) {
+                    if ($i + 1 < $queryLength && $query[$i + 1] === $stringChar) {
+                        $result .= $char . $char;
+                        $i++;
+                        continue;
+                    } elseif (!$escapeNext) {
+                        $inString = false;
+                    }
+                }
+
+                $result .= $char;
+                $escapeNext = false;
+                continue;
+            }
+
+            if (!$inString && $char === '{') {
+                $closingBrace = strpos($query, '}', $i);
+
+                if ($closingBrace !== false) {
+                    $placeholder = substr($query, $i, $closingBrace - $i + 1);
+
+                    if (preg_match('/^\{([a-zA-Z_][a-zA-Z0-9_]*)\:([^}]+)\}$/', $placeholder, $matches)) {
+                        $paramName = $matches[1];
+                        $type = $matches[2];
+
+                        if (!array_key_exists($paramName, $bindings)) {
+                            throw new \InvalidArgumentException(
+                                'Missing binding for ClickHouse parameter ' . $paramName
+                            );
+                        }
+
+                        $parameters[$paramName] = $this->formatParameter($bindings[$paramName], $type);
+                        $result .= $placeholder;
+                        $i = $closingBrace;
+                        $escapeNext = false;
+                        continue;
+                    }
+                }
+            }
+
+            $result .= $char;
+            $escapeNext = false;
+        }
+
+        $unusedBindings = array_diff_key($bindings, $parameters);
+
+        if (!empty($unusedBindings)) {
+            throw new \InvalidArgumentException(
+                'Too many bindings: expected ' . count($parameters) . ', got ' . count($bindings)
+            );
+        }
+
+        return [$result, $parameters];
     }
 
     /**
@@ -547,6 +661,13 @@ class Connection extends \Illuminate\Database\Connection
                 $result .= $char;
                 $escapeNext = false;
             }
+        }
+
+        // Validate that all bindings were consumed
+        if ($paramIndex < count($bindings)) {
+            throw new \InvalidArgumentException(
+                'Too many bindings: expected ' . $paramIndex . ', got ' . count($bindings)
+            );
         }
 
         // Validate that all placeholders were replaced
