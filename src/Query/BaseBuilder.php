@@ -2126,9 +2126,13 @@ abstract class BaseBuilder
             return $value;
         }
 
+        if ($value instanceof Expression) {
+            $this->mergeBindings($value->getBindings());
+            return $value;
+        }
+
         // Don't convert special objects
         if (
-            $value instanceof Expression ||
             $value instanceof Identifier ||
             $value instanceof Tuple ||
             $value instanceof BaseBuilder ||

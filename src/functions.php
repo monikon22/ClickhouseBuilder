@@ -52,9 +52,9 @@ if (!function_exists('raw')) {
      *
      * @return \Tinderbox\ClickhouseBuilder\Query\Expression
      */
-    function raw(string $expr): \Tinderbox\ClickhouseBuilder\Query\Expression
+    function raw(string $expr, array $bindings = []): \Tinderbox\ClickhouseBuilder\Query\Expression
     {
-        return new \Tinderbox\ClickhouseBuilder\Query\Expression($expr);
+        return new \Tinderbox\ClickhouseBuilder\Query\Expression($expr, $bindings);
     }
 }
 
