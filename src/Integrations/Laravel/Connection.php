@@ -549,13 +549,6 @@ class Connection extends \Illuminate\Database\Connection
             }
         }
 
-        // Validate that all bindings were consumed
-        if ($paramIndex < count($bindings)) {
-            throw new \InvalidArgumentException(
-                'Too many bindings: expected ' . $paramIndex . ', got ' . count($bindings)
-            );
-        }
-
         // Validate that all placeholders were replaced
         if (strpos($result, '?') !== false) {
             throw new \InvalidArgumentException('Not enough bindings to replace all placeholders.');
