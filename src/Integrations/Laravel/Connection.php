@@ -329,7 +329,7 @@ class Connection extends \Illuminate\Database\Connection
 
         $result = $this->getClient()->readOne($query, $tables, [], $parameters);
 
-        $this->logQuery($result->getQuery()->getQuery(), $parameters, $result->getStatistic()->getTime());
+        $this->logQuery($result->getQuery()->getQuery(), $parameters, $result->getStatistic()->getTime() * 1000);
 
         $this->setLastQueryStatistic($result->getStatistic());
 
@@ -359,7 +359,7 @@ class Connection extends \Illuminate\Database\Connection
             /* @var Query $query */
             $query = $result->getQuery();
 
-            $this->logQuery($query->getQuery(), [], $result->getStatistic()->getTime());
+            $this->logQuery($query->getQuery(), [], $result->getStatistic()->getTime() * 1000);
 
             $results[$i] = $result->getRows();
             $statistic[$i] = $result->getStatistic();
@@ -754,7 +754,7 @@ class Connection extends \Illuminate\Database\Connection
 
         $result = $this->getClient()->writeOne($query, [], [], $parameters);
 
-        $this->logQuery($query, $bindings, microtime(true) - $startTime);
+        $this->logQuery($query, $parameters, round((microtime(true) - $startTime) * 1000, 2));
 
         return $result;
     }
@@ -849,7 +849,7 @@ class Connection extends \Illuminate\Database\Connection
 
         $result = $this->getClient()->writeOne($query, [], [], $parameters);
 
-        $this->logQuery($query, $bindings, microtime(true) - $start);
+        $this->logQuery($query, $parameters, round((microtime(true) - $start) * 1000, 2));
 
         return $result;
     }
