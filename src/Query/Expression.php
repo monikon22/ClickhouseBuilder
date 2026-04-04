@@ -27,7 +27,13 @@ class Expression
     public function __construct($value, array $bindings = [])
     {
         $this->value = $value;
-        $this->bindings = $bindings;
+        $this->bindings = collect($bindings)->map(function ($binding, $key) {
+            if ($binding instanceof Parameter) {
+                return $binding;
+            }
+
+            return new Parameter($key, $binding);
+        })->all();
     }
 
     /**
