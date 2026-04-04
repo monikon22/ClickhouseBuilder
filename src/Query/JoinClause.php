@@ -102,7 +102,7 @@ class JoinClause
 
             $table = new Identifier($table);
         } elseif ($table instanceof BaseBuilder) {
-            $table = new Expression("({$table->toSql()})");
+            $table = new Expression("({$table->toSql()})", $table->getBindings());
         }
 
         $this->table = $table;
@@ -261,7 +261,7 @@ class JoinClause
         }
 
         if ($query instanceof BaseBuilder) {
-            $this->table(new Expression("({$query->toSql()})"));
+            $this->table(new Expression("({$query->toSql()})", $query->getBindings()));
         }
 
         return $this;
